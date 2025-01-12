@@ -1,0 +1,180 @@
+import 'package:flutter/material.dart';
+
+void main() {
+    runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+    @override
+    Widget build(BuildContext context) {
+        return MaterialApp(
+            home: SignUpPage(),
+        );
+    }
+}
+
+class SignUpPage extends StatefulWidget {
+    @override
+    _SignUpPageState createState() => _SignUpPageState();
+}
+
+class _SignUpPageState extends State<SignUpPage> {
+    final _formKey = GlobalKey<FormState>();
+    final _emailController = TextEditingController();
+    final _passwordController = TextEditingController();
+
+    @override
+    void dispose() {
+        _emailController.dispose();
+        _passwordController.dispose();
+        super.dispose();
+    }
+
+    bool _isUqEmail(String email) {
+        return email.endsWith('@uq.edu.au');
+    }
+
+    void _signUp() {
+        if (_formKey.currentState!.validate()) {
+            // Perform sign up logic here
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Signing up...')),
+            );
+        }
+    }
+
+    @override
+    Widget build(BuildContext context) {
+        return Scaffold(
+            appBar: AppBar(
+                title: Text('Sign Up'),
+            ),
+            body: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Form(
+                    key: _formKey,
+                    child: Column(
+                        children: <Widget>[
+                            TextFormField(
+                                controller: _emailController,
+                                decoration: InputDecoration(labelText: 'Email'),
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                        return 'Please enter an email';
+                                    } else if (!_isUqEmail(value)) {
+                                        return 'Please use a @uq.edu.au email';
+                                    }
+                                    return null;
+                                },
+                            ),
+                            TextFormField(
+                                controller: _passwordController,
+                                decoration: InputDecoration(labelText: 'Password'),
+                                obscureText: true,
+                                validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                        return 'Please enter a password';
+                                    }
+                                    return null;
+                                },
+                            ),
+                            SizedBox(height: 20),
+                            ElevatedButton(
+                                onPressed: _signUp,
+                                child: Text('Sign Up'),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+        );
+    }
+}
+import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
+
+void main() {
+    setUrlStrategy(PathUrlStrategy());
+    runApp(MyApp());
+}
+class CourseSelectionPage extends StatefulWidget {
+    @override
+    _CourseSelectionPageState createState() => _CourseSelectionPageState();
+}
+
+class _CourseSelectionPageState extends State<CourseSelectionPage> {
+    String? _selectedCourse;
+    final List<String> _courses = ['BAFE', 'Commerce', 'Med', 'Law', 'Eng'];
+
+    void _submit() {
+        if (_selectedCourse != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Course selected: $_selectedCourse')),
+            );
+        }
+    }
+
+    @override
+    Widget build(BuildContext context) {
+        return Scaffold(
+            appBar: AppBar(
+                title: Text('Select Course'),
+            ),
+            body: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                    children: <Widget>[
+                        Text('What course do you study?', style: TextStyle(fontSize: 18)),
+                        SizedBox(height: 20),
+                        DropdownButtonFormField<String>(
+                            value: _selectedCourse,
+                            items: _courses.map((course) {
+                                return DropdownMenuItem<String>(
+                                    value: course,
+                                    child: Text(course),
+                                );
+                            }).toList(),
+                            onChanged: (value) {
+                                setState(() {
+                                    _selectedCourse = value;
+                                });
+                            },
+                            decoration: InputDecoration(
+                                labelText: 'Course',
+                                border: OutlineInputBorder(),
+                            ),
+                        ),
+                        SizedBox(height: 20),
+                        ElevatedButton(
+                            onPressed: _submit,
+                            child: Text('Submit'),
+                        ),
+                    ],
+                ),
+            ),
+        );
+    }
+}
+
+class MyApp extends StatelessWidget {
+    @override
+    Widget build(BuildContext context) {
+        return MaterialApp(
+            home: Banner(
+                message: "UniVerse",
+                location: BannerLocation.topEnd,
+                child: SignUpPage(),
+            ),
+        );
+    }
+}
+
+void _signUp() {
+    if (_formKey.currentState!.validate()) {
+        Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => CourseSelectionPage()),
+        );
+    }
+}
