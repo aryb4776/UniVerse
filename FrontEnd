@@ -1,180 +1,216 @@
-import 'package:flutter/material.dart';
+// social_media_app_hybrid.js
 
-void main() {
-    runApp(MyApp());
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, Button, FlatList, Image, StyleSheet, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
+const API_URL = 'http://localhost:5000/api'; // Replace with your backend URL
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [content, setContent] = useState('');
+  const [image, setImage] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [comments, setComments] = useState('');
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  // Fetch posts
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/posts`);
+        setPosts(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchPosts();
+  }, []);
+
+  // Handle login
+  const login = async () => {
+    try {
+      if (!email.endsWith('@uq.edu.au')) {
+        Alert.alert('Error', 'Only @uq.edu.au emails are allowed');
+        return;
+      }
+
+      const res = await axios.post(`${API_URL}/login`, { email, password });
+      setUser(res.data.user);
+      await AsyncStorage.setItem('token', res.data.token);
+    } catch (err) {
+      Alert.alert('Error', 'Invalid login credentials');
+    }
+  };
+
+  // Handle post creation
+  const createPost = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('content', content);
+      if (image) formData.append('image', { uri: image.uri, name: 'photo.jpg', type: 'image/jpeg' });
+
+      const res = await axios.post(`${API_URL}/posts`, formData, {
+        headers: { Authorization: token, 'Content-Type': 'multipart/form-data' },
+      });
+      setPosts([res.data, ...posts]);
+      setContent('');
+      setImage(null);
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to create post');
+    }
+  };
+
+  // Handle like
+  const likePost = async (postId) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const res = await axios.post(`${API_URL}/posts/${postId}/like`, {}, {
+        headers: { Authorization: token },
+      });
+      setPosts(posts.map((post) => (post._id === postId ? res.data : post)));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Handle comment
+  const commentOnPost = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const res = await axios.post(
+        `${API_URL}/posts/${selectedPost._id}/comment`,
+        { comment: comments },
+        { headers: { Authorization: token } }
+      );
+      setPosts(posts.map((post) => (post._id === selectedPost._id ? res.data : post)));
+      setComments('');
+      setModalVisible(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Render login screen
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Login</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+        <Button title="Login" onPress={login} />
+      </View>
+    );
+  }
+
+  // Render main app
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Welcome, {user.username}</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="What's on your mind?"
+        value={content}
+        onChangeText={setContent}
+      />
+      <Button title="Post" onPress={createPost} />
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => (
+          <View style={styles.post}>
+            <Text style={styles.postAuthor}>{item.userId.username}</Text>
+            <Text>{item.content}</Text>
+            {item.image && <Image source={{ uri: item.image }} style={styles.postImage} />}
+            <View style={styles.interactions}>
+              <TouchableOpacity onPress={() => likePost(item._id)}>
+                <Text>Like ({item.likes.length})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => {
+                setSelectedPost(item);
+                setModalVisible(true);
+              }}>
+                <Text>Comment ({item.comments.length})</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      />
+      <Modal visible={modalVisible} animationType="slide">
+        <View style={styles.modalContainer}>
+          <Text style={styles.title}>Add a Comment</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Write a comment..."
+            value={comments}
+            onChangeText={setComments}
+          />
+          <Button title="Submit" onPress={commentOnPost} />
+          <Button title="Close" onPress={() => setModalVisible(false)} />
+        </View>
+      </Modal>
+    </View>
+  );
 }
 
-class MyApp extends StatelessWidget {
-    @override
-    Widget build(BuildContext context) {
-        return MaterialApp(
-            home: SignUpPage(),
-        );
-    }
-}
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  post: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  postAuthor: {
+    fontWeight: 'bold',
+  },
+  postImage: {
+    width: '100%',
+    height: 200,
+    marginTop: 10,
+  },
+  interactions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+  },
+});
 
-class SignUpPage extends StatefulWidget {
-    @override
-    _SignUpPageState createState() => _SignUpPageState();
-}
-
-class _SignUpPageState extends State<SignUpPage> {
-    final _formKey = GlobalKey<FormState>();
-    final _emailController = TextEditingController();
-    final _passwordController = TextEditingController();
-
-    @override
-    void dispose() {
-        _emailController.dispose();
-        _passwordController.dispose();
-        super.dispose();
-    }
-
-    bool _isUqEmail(String email) {
-        return email.endsWith('@uq.edu.au');
-    }
-
-    void _signUp() {
-        if (_formKey.currentState!.validate()) {
-            // Perform sign up logic here
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Signing up...')),
-            );
-        }
-    }
-
-    @override
-    Widget build(BuildContext context) {
-        return Scaffold(
-            appBar: AppBar(
-                title: Text('Sign Up'),
-            ),
-            body: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Form(
-                    key: _formKey,
-                    child: Column(
-                        children: <Widget>[
-                            TextFormField(
-                                controller: _emailController,
-                                decoration: InputDecoration(labelText: 'Email'),
-                                keyboardType: TextInputType.emailAddress,
-                                validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                        return 'Please enter an email';
-                                    } else if (!_isUqEmail(value)) {
-                                        return 'Please use a @uq.edu.au email';
-                                    }
-                                    return null;
-                                },
-                            ),
-                            TextFormField(
-                                controller: _passwordController,
-                                decoration: InputDecoration(labelText: 'Password'),
-                                obscureText: true,
-                                validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                        return 'Please enter a password';
-                                    }
-                                    return null;
-                                },
-                            ),
-                            SizedBox(height: 20),
-                            ElevatedButton(
-                                onPressed: _signUp,
-                                child: Text('Sign Up'),
-                            ),
-                        ],
-                    ),
-                ),
-            ),
-        );
-    }
-}
-import 'package:flutter/material.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
-
-void main() {
-    setUrlStrategy(PathUrlStrategy());
-    runApp(MyApp());
-}
-class CourseSelectionPage extends StatefulWidget {
-    @override
-    _CourseSelectionPageState createState() => _CourseSelectionPageState();
-}
-
-class _CourseSelectionPageState extends State<CourseSelectionPage> {
-    String? _selectedCourse;
-    final List<String> _courses = ['BAFE', 'Commerce', 'Med', 'Law', 'Eng'];
-
-    void _submit() {
-        if (_selectedCourse != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Course selected: $_selectedCourse')),
-            );
-        }
-    }
-
-    @override
-    Widget build(BuildContext context) {
-        return Scaffold(
-            appBar: AppBar(
-                title: Text('Select Course'),
-            ),
-            body: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                    children: <Widget>[
-                        Text('What course do you study?', style: TextStyle(fontSize: 18)),
-                        SizedBox(height: 20),
-                        DropdownButtonFormField<String>(
-                            value: _selectedCourse,
-                            items: _courses.map((course) {
-                                return DropdownMenuItem<String>(
-                                    value: course,
-                                    child: Text(course),
-                                );
-                            }).toList(),
-                            onChanged: (value) {
-                                setState(() {
-                                    _selectedCourse = value;
-                                });
-                            },
-                            decoration: InputDecoration(
-                                labelText: 'Course',
-                                border: OutlineInputBorder(),
-                            ),
-                        ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                            onPressed: _submit,
-                            child: Text('Submit'),
-                        ),
-                    ],
-                ),
-            ),
-        );
-    }
-}
-
-class MyApp extends StatelessWidget {
-    @override
-    Widget build(BuildContext context) {
-        return MaterialApp(
-            home: Banner(
-                message: "UniVerse",
-                location: BannerLocation.topEnd,
-                child: SignUpPage(),
-            ),
-        );
-    }
-}
-
-void _signUp() {
-    if (_formKey.currentState!.validate()) {
-        Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => CourseSelectionPage()),
-        );
-    }
-}
